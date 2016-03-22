@@ -31,6 +31,7 @@ Router.map(function() {
       this.route('architecture');
       this.route('api-reference');
 
+
     });
     this.route('cookbook', function() {
       this.route('bootstrap-theme');
@@ -51,6 +52,8 @@ Router.map(function() {
 
   // Routes for fastboot tests
   this.route('fastboot-test');
+
+  this.route('multiple');
 });
 
 export default Router;
