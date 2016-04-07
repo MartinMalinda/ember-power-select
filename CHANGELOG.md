@@ -1,5 +1,35 @@
 # Master
 
+# 0.10.0-beta.8
+- [BUGFIX] Avoid highlight disabled options when they are the first option after a search. Instead,
+  highlight the first non-disabled option in the list. When all results are disabled, nothing gets
+  highlighted.
+- [ENHANCEMENT] Add a class to the component when an element inside has the focus. This allows to
+  style the component not only when the component itself is focused but when an input inside
+  is, which was previously impossible.
+- [BUGFIX] Allow to pass `horizontalPosition` to customize to which edge of the trigger
+  the dropdown is anchored to.
+
+# 0.10.0-beta.7
+- [FEATURE] The `selected` option can now also be a promise. When it's a promise, the component
+  won't have any selection (the trigger will be empty, no option of the list will be
+  highlighted) until that promise resolves. Once it resolves, the trigger and the highlighted
+  option will update.
+- [BUGFIX] Fixed bug after event-delegation refactor where mouseovering the list itself
+  (which happens when options are disabled) throwed an error.
+- [BUGFIX] Disabled select shouldn't be clearable even if `allowClear=true`.
+- [BUGFIX] In multiple selects when test in the searchbox was too long the text overflowed the trigger.
+
+# 0.10.0-beta.5
+- [REMOVE FEATURE] The `opened` property (the only using double bindings instead of DDAU) has been
+  removed. It was the cause of some errors due to race conditions in the bindings propagation.
+  It is still possible to pass `initiallyOpened=true` to render a select already opened, but it is
+  a one time property. It won't onpen/close the select when mutated nor will be mutated when the
+  select is opened or closed.
+
+# 0.10.0-beta.4
+- [BUGFIX] Fix option highlighting when the use mouseovers in an element inside the `<li>`s
+
 # 0.10.0-beta.3
 - [BUGFIX] Fix option selection when the use click in an element inside the `<li>`s
 - [BUGFIX] In multiple selects, deleting the last element of the list using BACKSPACE to trigger a

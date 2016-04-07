@@ -797,3 +797,204 @@ test('If the passed options is a promise that is resolved, searching should filt
     done();
   }, 150);
 });
+
+test('Disabled single selects don\'t have a clear button even if `allowClear` is true', function(assert) {
+  assert.expect(1);
+
+  this.numbers = numbers;
+  this.foo = numbers[2];
+  this.render(hbs`
+    {{#power-select options=numbers selected=foo onchange=(action (mut foo)) allowClear=true disabled=true as |option|}}
+      {{option}}
+    {{/power-select}}
+  `);
+
+  assert.equal(this.$('.ember-power-select-clear-btn').length, 0, 'There is no clear button');
+});
+
+test('If the passed selected element is a pending promise, the first element is highlighted and the trigger is empty', function(assert) {
+  assert.expect(3);
+
+  this.numbers = numbers;
+  this.selected = new RSVP.Promise(function(resolve) {
+    Ember.run.later(resolve, numbers[3], 50);
+  });
+
+  this.render(hbs`
+    {{#power-select options=numbers selected=selected onchange=(action (mut foo)) as |option|}}
+      {{option}}
+    {{/power-select}}
+  `);
+
+  clickTrigger();
+  assert.equal($('.ember-power-select-option[aria-current="true"]').text().trim(), 'one', 'The first element is highlighted');
+  assert.equal($('.ember-power-select-option[aria-selected="true"]').length, 0, 'no element is selected');
+  assert.equal(this.$('.ember-power-select-trigger').text().trim(), '', 'Nothing is selected yet');
+});
+
+test('If the passed selected element is a resolved promise, that element is selected and the trigger contains the proper text', function(assert) {
+  assert.expect(3);
+
+  this.numbers = numbers;
+  this.selected = RSVP.resolve(numbers[3]);
+
+  this.render(hbs`
+    {{#power-select options=numbers selected=selected onchange=(action (mut foo)) as |option|}}
+      {{option}}
+    {{/power-select}}
+  `);
+
+  clickTrigger();
+  assert.equal($('.ember-power-select-option[aria-current="true"]').text().trim(), 'four', 'The 4th element is highlighted');
+  assert.equal($('.ember-power-select-option[aria-selected="true"]').text().trim(), 'four', 'The 4th element is highlighted');
+  assert.equal(this.$('.ember-power-select-trigger').text().trim(), 'four', 'The trigger has the proper content');
+});
+
+test('If the passed selected element is a pending promise that resolves while the select is opened, the highlighted & selected elements get updated, along with the trigger', function(assert) {
+  let done = assert.async();
+  assert.expect(6);
+
+  this.numbers = numbers;
+  this.selected = new RSVP.Promise(function(resolve) {
+    Ember.run.later(resolve, numbers[3], 50);
+  });
+
+  this.render(hbs`
+    {{#power-select options=numbers selected=selected onchange=(action (mut foo)) as |option|}}
+      {{option}}
+    {{/power-select}}
+  `);
+
+  clickTrigger();
+  assert.equal($('.ember-power-select-option[aria-current="true"]').text().trim(), 'one', 'The first element is highlighted');
+  assert.equal($('.ember-power-select-option[aria-selected="true"]').length, 0, 'no element is selected');
+  assert.equal(this.$('.ember-power-select-trigger').text().trim(), '', 'Nothing is selected yet');
+
+  setTimeout(function() {
+    assert.equal($('.ember-power-select-option[aria-current="true"]').text().trim(), 'four', 'The 4th element is highlighted');
+    assert.equal($('.ember-power-select-option[aria-selected="true"]').text().trim(), 'four', 'The 4th element is highlighted');
+    assert.equal(this.$('.ember-power-select-trigger').text().trim(), 'four', 'The trigger has the proper content');
+    done();
+  }, 100);
+});
+
+test('When a promise resolves it doesn\'t overwrite a previous value if it isn\'t the same promise it resolved from', function(assert) {
+  let done = assert.async();
+  assert.expect(6);
+
+  let promise1 = new RSVP.Promise(function(resolve) {
+    Ember.run.later(resolve, numbers[3], 80);
+  });
+
+  let promise2 = new RSVP.Promise(function(resolve) {
+    Ember.run.later(resolve, numbers[4], 20);
+  });
+
+  this.numbers = numbers;
+  this.selected = promise1;
+
+  this.render(hbs`
+    {{#power-select options=numbers selected=selected onchange=(action (mut foo)) as |option|}}
+      {{option}}
+    {{/power-select}}
+  `);
+
+  this.set('selected', promise2);
+
+  clickTrigger();
+  assert.equal($('.ember-power-select-option[aria-current="true"]').text().trim(), 'one', 'The first element is highlighted');
+  assert.equal($('.ember-power-select-option[aria-selected="true"]').length, 0, 'no element is selected');
+  assert.equal(this.$('.ember-power-select-trigger').text().trim(), '', 'Nothing is selected yet');
+
+  setTimeout(function() {
+    assert.equal($('.ember-power-select-option[aria-current="true"]').text().trim(), 'five', 'The 5th element is highlighted');
+    assert.equal($('.ember-power-select-option[aria-selected="true"]').text().trim(), 'five', 'The 5th element is highlighted');
+    assert.equal(this.$('.ember-power-select-trigger').text().trim(), 'five', 'The trigger has the proper content');
+    done();
+  }, 100);
+});
+
+test('When both `selected` and `options` are async, and `selected` resolves before `options`, the proper options are selected/highlighted after each resolution', function(assert) {
+  let done = assert.async();
+  assert.expect(6);
+
+  this.asyncOptions = new Ember.RSVP.Promise((resolve) => {
+    setTimeout(() => resolve(numbers), 200);
+  });
+  this.asyncSelected = new Ember.RSVP.Promise((resolve) => {
+    setTimeout(() => resolve('four'), 10);
+  });
+
+  this.render(hbs`
+    {{#power-select options=asyncOptions selected=asyncSelected onchange=(action (mut foo)) as |option|}}
+      {{option}}
+    {{/power-select}}
+  `);
+
+  clickTrigger();
+
+  assert.equal($('.ember-power-select-option[aria-selected="true"]').length, 0, 'no element is selected');
+  assert.equal(this.$('.ember-power-select-trigger').text().trim(), '', 'Nothing is selected yet');
+
+  setTimeout(function() {
+    assert.equal(this.$('.ember-power-select-trigger').text().trim(), 'four', 'The trigger has the proper content');
+  }, 20);
+
+  setTimeout(function() {
+    assert.equal($('.ember-power-select-option[aria-current="true"]').text().trim(), 'four', 'The 4th element is highlighted');
+    assert.equal($('.ember-power-select-option[aria-selected="true"]').text().trim(), 'four', 'The 4th element is selected');
+    assert.equal(this.$('.ember-power-select-trigger').text().trim(), 'four', 'The trigger has the proper content');
+    done();
+  }, 220);
+});
+
+test('When both `selected` and `options` are async, and `options` resolves before `selected`, the proper options are selected/highlighted after each resolution', function(assert) {
+  let done = assert.async();
+  assert.expect(7);
+
+  this.asyncOptions = new Ember.RSVP.Promise((resolve) => {
+    setTimeout(() => resolve(numbers), 10);
+  });
+  this.asyncSelected = new Ember.RSVP.Promise((resolve) => {
+    setTimeout(() => resolve('four'), 200);
+  });
+
+  this.render(hbs`
+    {{#power-select options=asyncOptions selected=asyncSelected onchange=(action (mut foo)) as |option|}}
+      {{option}}
+    {{/power-select}}
+  `);
+
+  clickTrigger();
+
+  assert.equal($('.ember-power-select-option[aria-selected="true"]').length, 0, 'no element is selected');
+  assert.equal(this.$('.ember-power-select-trigger').text().trim(), '', 'Nothing is selected yet');
+
+  setTimeout(function() {
+    assert.equal(this.$('.ember-power-select-trigger').text().trim(), '', 'The trigger is still empty');
+    assert.equal($('.ember-power-select-option[aria-current="true"]').text().trim(), 'one', 'The 1st element is highlighted');
+  }, 20);
+
+  setTimeout(function() {
+    assert.equal($('.ember-power-select-option[aria-current="true"]').text().trim(), 'four', 'The 4th element is highlighted');
+    assert.equal($('.ember-power-select-option[aria-selected="true"]').text().trim(), 'four', 'The 4th element is selected');
+    assert.equal(this.$('.ember-power-select-trigger').text().trim(), 'four', 'The trigger has the proper content');
+    done();
+  }, 220);
+});
+
+test('When the input inside the select gets focused the entire component gains the `ember-basic-dropdown--focus-inside` class', function(assert) {
+  assert.expect(2);
+
+  this.numbers = numbers;
+  this.render(hbs`
+    {{#power-select options=numbers onchange=(action (mut foo)) as |option|}}
+      {{option}}
+    {{/power-select}}
+  `);
+
+  assert.ok(!this.$('.ember-power-select').hasClass('ember-basic-dropdown--focus-inside'), 'The select doesn\'t have the class yet');
+  clickTrigger();
+  Ember.run(() => $('.ember-power-select-search input').focus());
+  assert.ok(this.$('.ember-power-select').hasClass('ember-basic-dropdown--focus-inside'), 'The select has the class now');
+});

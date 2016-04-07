@@ -21,8 +21,12 @@ export default Ember.Component.extend({
       if (e.target.dataset.selectedIndex) {
         e.stopPropagation();
         e.preventDefault();
+
+        let index = e.target.dataset.selectedIndex;
         let selected = this.get('selected');
-        this.get('select.actions.choose')(get(selected, e.target.dataset.selectedIndex));
+        let object = this.selectedObject(selected, index);
+
+        this.get('select.actions.choose')(object);
       }
     };
     if (isTouchDevice) {
@@ -45,9 +49,9 @@ export default Ember.Component.extend({
   triggerMultipleInputStyle: computed('searchText.length', 'selected.length', function() {
     run.scheduleOnce('afterRender', this.get('select.actions.reposition'));
     if (this.get('selected.length') === 0) {
-      return htmlSafe('min-width: 100%;');
+      return htmlSafe('width: 100%;');
     } else {
-      return htmlSafe(`min-width: ${(this.get('searchText.length') || 0) * 0.5 + 0.5}em`);
+      return htmlSafe(`width: ${(this.get('searchText.length') || 0) * 0.5 + 0.5}em`);
     }
   }),
 
@@ -98,5 +102,13 @@ export default Ember.Component.extend({
 
   updateInput(value) {
     updateInput(this.input, value);
+  },
+
+  selectedObject(list, index) {
+    if (list.objectAt) {
+      return list.objectAt(index);
+    } else {
+      return get(list, index);
+    }
   }
 });

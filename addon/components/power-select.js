@@ -5,6 +5,11 @@ import fallbackIfUndefined from '../utils/computed-fallback-if-undefined';
 
 const { computed, run, get, isBlank } = Ember;
 const EventSender = Ember.Object.extend(Ember.Evented);
+const assign = Ember.assign || Ember.merge;
+function concatWithProperty(strings, property) {
+  if (property) { strings.push(property); }
+  return strings.join(' ');
+}
 
 export default Ember.Component.extend({
   // HTML
@@ -17,6 +22,7 @@ export default Ember.Component.extend({
   loadingMessage: fallbackIfUndefined('Loading options...'),
   noMatchesMessage: fallbackIfUndefined('No results found'),
   verticalPosition: fallbackIfUndefined('auto'),
+  horizontalPosition: fallbackIfUndefined('auto'),
   matcher: fallbackIfUndefined(defaultMatcher),
   searchField: fallbackIfUndefined(null),
   search: fallbackIfUndefined(null),
@@ -24,7 +30,7 @@ export default Ember.Component.extend({
   dropdownClass: fallbackIfUndefined(null),
   triggerClass: fallbackIfUndefined(null),
   dir: fallbackIfUndefined(null),
-  opened: fallbackIfUndefined(false),
+  initiallyOpened: fallbackIfUndefined(false),
   searchEnabled: fallbackIfUndefined(true),
   searchMessage: fallbackIfUndefined("Type to search"),
   searchPlaceholder: fallbackIfUndefined(null),
@@ -67,25 +73,18 @@ export default Ember.Component.extend({
   }),
 
   concatenatedClasses: computed('class', function() {
-    const classes = ['ember-power-select'];
-    if (this.get('class')) { classes.push(this.get('class')); }
-    return classes.join(' ');
+    return concatWithProperty(['ember-power-select'], this.get('class'));
   }),
 
   concatenatedTriggerClasses: computed('triggerClass', function() {
-    let classes = ['ember-power-select-trigger'];
-    if (this.get('triggerClass')) {
-      classes.push(this.get('triggerClass'));
-    }
-    return classes.join(' ');
+    return concatWithProperty(['ember-power-select-trigger'], this.get('triggerClass'));
   }),
 
   concatenatedDropdownClasses: computed('dropdownClass', function() {
-    let classes = ['ember-power-select-dropdown', `ember-power-select-dropdown-${this.elementId}`];
-    if (this.get('dropdownClass')) {
-      classes.push(this.get('dropdownClass'));
-    }
-    return classes.join(' ');
+    return concatWithProperty(
+      ['ember-power-select-dropdown', `ember-power-select-dropdown-${this.elementId}`],
+      this.get('dropdownClass')
+    );
   }),
 
   mustShowSearchMessage: computed('searchText', 'search', 'searchMessage', 'results.length', function(){
@@ -120,6 +119,24 @@ export default Ember.Component.extend({
     }
   }),
 
+  resolvedSelected: computed('selected', {
+    get() {
+      let selected = this.get('selected');
+      if (selected && selected.then) {
+        selected.then(value => {
+          if (this.get('isDestroyed')) { return; }
+          // Ensure that we don't overwrite new value
+          if (this.get('selected') === selected) {
+            this.set('resolvedSelected', value);
+          }
+        });
+      } else {
+        return selected;
+      }
+    },
+    set(_, v) { return v; }
+  }),
+
   optionMatcher: computed('searchField', 'matcher', function() {
     let { matcher, searchField } = this.getProperties('matcher', 'searchField');
     if (searchField) {
@@ -129,7 +146,7 @@ export default Ember.Component.extend({
     }
   }),
 
-  highlighted: computed('results.[]', 'currentlyHighlighted', 'selected', function() {
+  highlighted: computed('results.[]', 'currentlyHighlighted', 'resolvedSelected', function() {
     return this.get('currentlyHighlighted') || this.defaultHighlighted();
   }),
 
@@ -155,7 +172,7 @@ export default Ember.Component.extend({
         isOpen: dropdown.isOpen,
         highlighted: this.get('highlighted'),
         searchText: this.get('searchText'),
-        actions: Ember.merge(ownActions, dropdown.actions)
+        actions: assign(ownActions, dropdown.actions)
       };
     }
     return {};
@@ -314,14 +331,18 @@ export default Ember.Component.extend({
     return nextOption;
   },
 
-  filter(options, term) {
-    return filterOptions(options || [], term, this.get('optionMatcher'));
+  filter(options, term, skipDisabled = false) {
+    return filterOptions(options || [], term, this.get('optionMatcher'), skipDisabled);
   },
 
   defaultHighlighted() {
-    const selected = this.get('selected');
+    const selected = this.get('resolvedSelected');
     if (!selected || this.indexOfOption(selected) === -1) {
-      return this.optionAtIndex(0);
+      let nextOption = this.optionAtIndex(0);
+      while (nextOption && nextOption.disabled) {
+        nextOption = this.advanceSelectableOption(nextOption, 1);
+      }
+      return nextOption;
     }
     return selected;
   },
@@ -335,7 +356,7 @@ export default Ember.Component.extend({
       e.preventDefault();
       e.stopPropagation();
     }
-    if (this.get('selected') !== selected) {
+    if (this.get('resolvedSelected') !== selected) {
       this.get('onchange')(selected, this.get('publicAPI'));
     }
   },
@@ -400,7 +421,7 @@ export default Ember.Component.extend({
     let term = this.get('expirableSearchText') + String.fromCharCode(e.keyCode);
     this.set('expirableSearchText', term);
     this.expirableSearchDebounceId = run.debounce(this, 'set', 'expirableSearchText', '', 1000);
-    let firstMatch = this.filter(this.get('results'), term)[0]; // TODO: match only words starting with this substr?
+    let firstMatch = this.filter(this.get('results'), term, true)[0]; // TODO: match only words starting with this substr?
     if (firstMatch !== undefined) {
       if (dropdown.isOpen) {
         this._doHighlight(dropdown, firstMatch, e);
