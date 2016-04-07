@@ -51,12 +51,10 @@ export default Ember.Component.extend({
   },
 
   focusInput() {
-    console.log('focusing input');
     this.input = self.document.querySelector('.ember-power-select-search input');
     if (this.input) {
       run.scheduleOnce('afterRender', this.input, 'focus');
       run.scheduleOnce('afterRender', () => {
-        console.log($(this.input).is(':focus'));
       });
     }
   }
